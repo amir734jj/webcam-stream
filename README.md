@@ -16,3 +16,7 @@ imageCapture.ImageHandler += (_, payload) =>
 
 await imageCapture.Run();
 ```
+
+TODO:
+- ability to select the webcam form a list
+- detect webcam resolution instead of guessing it
