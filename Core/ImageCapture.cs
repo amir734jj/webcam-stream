@@ -33,13 +33,58 @@ namespace WebcamStream
         /// </summary>
         private readonly uint _lines;
 
+        /// <summary>
+        /// Capture height
+        /// </summary>
         private readonly uint _height;
+        
+        /// <summary>
+        /// Capture width
+        /// </summary>
         private readonly uint _width;
+        
+        /// <summary>
+        /// Timespan between each capture
+        /// </summary>
         private readonly TimeSpan _between;
+
+        /// <summary>
+        /// Logger instance
+        /// </summary>
         private readonly ILogger<ImageCapture> _logger;
 
+        /// <summary>
+        /// Callback when image is available
+        /// </summary>
         public EventHandler<Payload> ImageHandler;
+        
+        /// <summary>
+        /// Memory mapped access
+        /// </summary>
+        private MemoryMappedFile _currentMappedFile;
+        
+        /// <summary>
+        /// Memory mapped viewer
+        /// </summary>
+        private MemoryMappedViewAccessor _currentMappedViewAccessor;
+        
+        /// <summary>
+        /// Concurrent queue of files to process
+        /// </summary>
+        private readonly ConcurrentQueue<(MemoryMappedFile file, MemoryMappedViewAccessor accessor)> _filesToProcess;
+        
+        /// <summary>
+        /// Current frame number
+        /// </summary>
+        private ulong _frameCounter;
 
+        /// <summary>
+        /// Constructor
+        /// </summary>
+        /// <param name="width"></param>
+        /// <param name="height"></param>
+        /// <param name="between"></param>
+        /// <param name="logger"></param>
         public ImageCapture(uint width, uint height, TimeSpan between, ILogger<ImageCapture> logger)
         {
             _height = height;
@@ -51,7 +96,7 @@ namespace WebcamStream
             _pitch = Align(width * BytePerPixel);
             _lines = Align(height);
 
-            uint Align(uint size)
+            static uint Align(uint size)
             {
                 if (size % 32 == 0)
                 {
@@ -62,11 +107,10 @@ namespace WebcamStream
             }
         }
 
-        private MemoryMappedFile _currentMappedFile;
-        private MemoryMappedViewAccessor _currentMappedViewAccessor;
-        private readonly ConcurrentQueue<(MemoryMappedFile file, MemoryMappedViewAccessor accessor)> _filesToProcess;
-        private long _frameCounter;
-
+        /// <summary>
+        /// Begins extracting the thumbnails
+        /// </summary>
+        /// <returns></returns>
         public async Task Run()
         {
             // Load native libVlc library
@@ -76,7 +120,7 @@ namespace WebcamStream
             using var mediaPlayer = new MediaPlayer(libVlc);
             // Listen to events
             var processingCancellationTokenSource = new CancellationTokenSource();
-            mediaPlayer.Stopped += (s, e) => processingCancellationTokenSource.CancelAfter(1);
+            mediaPlayer.Stopped += delegate { processingCancellationTokenSource.CancelAfter(1); };
 
             // Create new media
             using var media = new Media(libVlc, "v4l2:///dev/video0", FromType.FromLocation);
@@ -94,7 +138,7 @@ namespace WebcamStream
             // Waits for the processing to stop
             try
             {
-                await ProcessThumbnailsAsync(processingCancellationTokenSource.Token);
+                await ProcessThumbnails(processingCancellationTokenSource.Token);
             }
             catch (OperationCanceledException exception)
             {
@@ -106,7 +150,12 @@ namespace WebcamStream
             }
         }
 
-        private async Task ProcessThumbnailsAsync(CancellationToken token)
+        /// <summary>
+        /// Process the thumbnail
+        /// </summary>
+        /// <param name="token"></param>
+        /// <returns></returns>
+        private async Task ProcessThumbnails(CancellationToken token)
         {
             var frameNumber = 0UL;
             while (!token.IsCancellationRequested)
@@ -116,15 +165,10 @@ namespace WebcamStream
                     using (var image = new Image<Bgra32>((int)(_pitch / BytePerPixel), (int)_lines))
                     await using (var sourceStream = file.file.CreateViewStream())
                     {
-                        // Working:
                         sourceStream.Read(MemoryMarshal.AsBytes(image.GetPixelMemoryGroup().Single().Span));
-                        
-                        // NOT Working:
-                        // var bytes = MemoryMarshal.AsBytes(image.GetPixelMemoryGroup().Single().Span).ToArray();
-                        // await sourceStream.ReadAsync(bytes, 0, bytes.Length, token);
-                        
+
                         ImageHandler?.Invoke(null, new Payload(frameNumber, image));
-                        _logger.LogInformation(@"Successfully emitted frame number: {}", frameNumber);
+                        _logger.LogInformation(@"Successfully emitted frame number: {frameNumber}", frameNumber);
                     }
 
                     file.accessor.Dispose();
@@ -138,6 +182,12 @@ namespace WebcamStream
             }
         }
 
+        /// <summary>
+        /// Lock memory map
+        /// </summary>
+        /// <param name="opaque"></param>
+        /// <param name="planes"></param>
+        /// <returns></returns>
         private IntPtr Lock(IntPtr opaque, IntPtr planes)
         {
             _currentMappedFile = MemoryMappedFile.CreateNew(null, _pitch * _lines);
@@ -146,6 +196,11 @@ namespace WebcamStream
             return IntPtr.Zero;
         }
 
+        /// <summary>
+        /// Extract image
+        /// </summary>
+        /// <param name="opaque"></param>
+        /// <param name="picture"></param>
         private void Display(IntPtr opaque, IntPtr picture)
         {
             if (_frameCounter % 100 == 0)

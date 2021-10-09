@@ -17,6 +17,9 @@ imageCapture.ImageHandler += (_, payload) =>
 await imageCapture.Run();
 ```
 
+Notes:
+- Follow this guide to install [libvlc](https://github.com/videolan/libvlcsharp#installation)
+
 TODO:
 - ability to select the webcam form a list
 - detect webcam resolution instead of guessing it
