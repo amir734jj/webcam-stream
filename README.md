@@ -20,3 +20,6 @@ await imageCapture.Run();
 TODO:
 - ability to select the webcam form a list
 - detect webcam resolution instead of guessing it
+
+Source:
+https://code.videolan.org/mfkl/libvlcsharp-samples/-/blob/master/PreviewThumbnailExtractor/Program.cs
