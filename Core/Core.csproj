@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>netcoreapp3.1</TargetFramework>
+        <RootNamespace>WebcamStream</RootNamespace>
+        <AssemblyName>WebcamStream</AssemblyName>
+        <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+        <Description>Strem webcam as an image</Description>
+        <RepositoryUrl>https://github.com/amir734jj/webcam-stream</RepositoryUrl>
+        <PackageProjectUrl>https://github.com/amir734jj/webcam-stream</PackageProjectUrl>
+        <AssemblyVersion>0.0.1</AssemblyVersion>
+        <PackageReleaseNotes>Initial working state</PackageReleaseNotes>
+        <FileVersion>0.0.1</FileVersion>
+        <Version>0.0.1</Version>
+        <LangVersion>latest</LangVersion>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <PackageReference Include="LibVLCSharp" Version="3.6.1" />
+      <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="3.1.19" />
+      <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="3.1.19" />
+      <PackageReference Include="SixLabors.ImageSharp" Version="1.0.4" />
+      <PackageReference Include="SocketIOClient" Version="3.0.3" />
+      <PackageReference Include="System.Reactive" Version="5.0.0" />
+    </ItemGroup>
+
+</Project>
