@@ -9,6 +9,7 @@ using LibVLCSharp.Shared;
 using Microsoft.Extensions.Logging;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Advanced;
+using SixLabors.ImageSharp.PixelFormats;
 using WebcamStream.Models;
 
 namespace WebcamStream
@@ -80,7 +81,6 @@ namespace WebcamStream
             // Create new media
             using var media = new Media(libVlc, "v4l2:///dev/video0", FromType.FromLocation);
             media.AddOption($":chroma=mp2v --v4l2-width {_width} --v4l2-height {_height}");
-            media.AddOption("::sout=#transcode{vcodec=h264,acodec=mpga,ab=128,channels=2,samplerate=44100,scodec=none}");
             media.AddOption(":no-sout-all");
             media.AddOption(":sout-keep");
             media.AddOption(":no-audio");
@@ -113,11 +113,16 @@ namespace WebcamStream
             {
                 if (_filesToProcess.TryDequeue(out var file))
                 {
-                    using (var image =
-                        new Image<SixLabors.ImageSharp.PixelFormats.Bgra32>((int)(_pitch / BytePerPixel), (int)_lines))
+                    using (var image = new Image<Bgra32>((int)(_pitch / BytePerPixel), (int)_lines))
                     await using (var sourceStream = file.file.CreateViewStream())
                     {
+                        // Working:
                         sourceStream.Read(MemoryMarshal.AsBytes(image.GetPixelMemoryGroup().Single().Span));
+                        
+                        // NOT Working:
+                        // var bytes = MemoryMarshal.AsBytes(image.GetPixelMemoryGroup().Single().Span).ToArray();
+                        // await sourceStream.ReadAsync(bytes, 0, bytes.Length, token);
+                        
                         ImageHandler?.Invoke(null, new Payload(frameNumber, image));
                         _logger.LogInformation(@"Successfully emitted frame number: {}", frameNumber);
                     }

@@ -13,15 +13,15 @@ namespace TestConsoleApp
         {
             var logging = LoggerFactory.Create(x => x.AddConsole());
             var logger = logging.CreateLogger<ImageCapture>();
-            var d = new ImageCapture(920, 720, TimeSpan.FromSeconds(1), logger);
-            d.ImageHandler += (_, payload) =>
+            var imageCapture = new ImageCapture(920, 720, TimeSpan.FromMilliseconds(100), logger);
+            imageCapture.ImageHandler += (_, payload) =>
             {
                 var stream = new MemoryStream();
                 payload.Image.SaveAsJpeg(stream);
                 File.WriteAllBytes($"../../../{payload.SequenceNumber:0000}.jpg", stream.ToArray());
             };
 
-            await d.Run();
+            await imageCapture.Run();
         }
     }
 }
