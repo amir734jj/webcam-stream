@@ -20,6 +20,9 @@ await imageCapture.Run();
 Notes:
 - Follow this guide to install [libvlc](https://github.com/videolan/libvlcsharp#installation)
 
+Bonus:
+- Blazor app to stream images to create a live stream
+
 TODO:
 - ability to select the webcam form a list
 - detect webcam resolution instead of guessing it

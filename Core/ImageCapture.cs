@@ -14,7 +14,7 @@ using WebcamStream.Models;
 
 namespace WebcamStream
 {
-    public class ImageCapture
+    public class ImageCapture : IDisposable
     {
         /// <summary>
         /// RGBA is used, so 4 byte per pixel, or 32 bits.
@@ -51,7 +51,7 @@ namespace WebcamStream
         /// <summary>
         /// Logger instance
         /// </summary>
-        private readonly ILogger<ImageCapture> _logger;
+        private readonly ILogger _logger;
 
         /// <summary>
         /// Callback when image is available
@@ -78,6 +78,10 @@ namespace WebcamStream
         /// </summary>
         private ulong _frameCounter;
 
+        private LibVLC _libVlc;
+        
+        private MediaPlayer _mediaPlayer;
+
         /// <summary>
         /// Constructor
         /// </summary>
@@ -85,7 +89,7 @@ namespace WebcamStream
         /// <param name="height"></param>
         /// <param name="between"></param>
         /// <param name="logger"></param>
-        public ImageCapture(uint width, uint height, TimeSpan between, ILogger<ImageCapture> logger)
+        public ImageCapture(uint width, uint height, TimeSpan between, ILogger logger)
         {
             _height = height;
             _width = width;
@@ -116,24 +120,26 @@ namespace WebcamStream
             // Load native libVlc library
             Core.Initialize();
 
-            using var libVlc = new LibVLC();
-            using var mediaPlayer = new MediaPlayer(libVlc);
+            using (this._libVlc = new LibVLC());
+            using (this._mediaPlayer = new MediaPlayer(_libVlc));
+
             // Listen to events
             var processingCancellationTokenSource = new CancellationTokenSource();
-            mediaPlayer.Stopped += delegate { processingCancellationTokenSource.CancelAfter(1); };
+            _mediaPlayer.Stopped += delegate { processingCancellationTokenSource.CancelAfter(1); };
 
             // Create new media
-            using var media = new Media(libVlc, "v4l2:///dev/video0", FromType.FromLocation);
+            using var media = new Media(_libVlc, "v4l2:///dev/video0", FromType.FromLocation);
             media.AddOption($":chroma=mp2v --v4l2-width {_width} --v4l2-height {_height}");
+            media.AddOption("::sout='#transcode{{vcodec=h264,acodec=mpga,ab=128,channels=2,samplerate=44100,scodec=none}}'");
             media.AddOption(":no-sout-all");
             media.AddOption(":sout-keep");
             media.AddOption(":no-audio");
             // Set the size and format of the video here.
-            mediaPlayer.SetVideoFormat("RV32", _width, _height, _pitch);
-            mediaPlayer.SetVideoCallbacks(Lock, null, Display);
+            _mediaPlayer.SetVideoFormat("RV32", _width, _height, _pitch);
+            _mediaPlayer.SetVideoCallbacks(Lock, null, Display);
 
             // Start recording
-            mediaPlayer.Play(media);
+            _mediaPlayer.Play(media);
 
             // Waits for the processing to stop
             try
@@ -162,8 +168,9 @@ namespace WebcamStream
             {
                 if (_filesToProcess.TryDequeue(out var file))
                 {
-                    using (var image = new Image<Bgra32>((int)(_pitch / BytePerPixel), (int)_lines))
-                    await using (var sourceStream = file.file.CreateViewStream())
+                    using var image = new Image<Bgra32>((int)(_pitch / BytePerPixel), (int)_lines);
+                    // ReSharper disable once UseAwaitUsing
+                    using var sourceStream = file.file.CreateViewStream();
                     {
                         sourceStream.Read(MemoryMarshal.AsBytes(image.GetPixelMemoryGroup().Single().Span));
 
@@ -218,6 +225,14 @@ namespace WebcamStream
             }
 
             _frameCounter++;
+        }
+
+        public void Dispose()
+        {
+            _currentMappedFile?.Dispose();
+            _currentMappedViewAccessor?.Dispose();
+            _mediaPlayer.Dispose();
+            _libVlc.Dispose();
         }
     }
 }

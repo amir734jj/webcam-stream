@@ -1,0 +1,36 @@
+﻿@page "/"
+@inject ImageStream _imageStream
+
+<h1>Hello, world!</h1>
+
+Welcome to your new app.
+
+@if (_image != null)
+{
+    <img src="@_image" alt="Frame number" style="display: block"  />
+}
+
+@code {
+    private string _image;
+
+    protected override void OnInitialized()
+    {
+        _imageStream.ImageBase64Handler += ImageHandlerCallback;
+    }
+
+    void ImageHandlerCallback(object _, string payload)
+    {
+        _image = payload;
+        InvokeAsync(StateHasChanged);
+    }
+    
+    public void Dispose()
+    {
+        _imageStream.ImageBase64Handler -= ImageHandlerCallback;
+    }
+
+    public void IncrementCount()
+    {
+        
+    }
+}
