@@ -14,7 +14,7 @@ namespace Api
 
         public ImageStream(ILogger<ImageStream> logger)
         {
-            imageCapture = new ImageCapture(640, 480, TimeSpan.FromMilliseconds(10), logger);
+            imageCapture = new ImageCapture(640, 480, TimeSpan.FromSeconds(1), logger);
 
             imageCapture.ImageHandler += (_, payload) =>
             {

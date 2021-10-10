@@ -120,39 +120,40 @@ namespace WebcamStream
             // Load native libVlc library
             Core.Initialize();
 
-            using (this._libVlc = new LibVLC());
-            using (this._mediaPlayer = new MediaPlayer(_libVlc));
-
-            // Listen to events
-            var processingCancellationTokenSource = new CancellationTokenSource();
-            _mediaPlayer.Stopped += delegate { processingCancellationTokenSource.CancelAfter(1); };
-
-            // Create new media
-            using var media = new Media(_libVlc, "v4l2:///dev/video0", FromType.FromLocation);
-            media.AddOption($":chroma=mp2v --v4l2-width {_width} --v4l2-height {_height}");
-            media.AddOption("::sout='#transcode{{vcodec=h264,acodec=mpga,ab=128,channels=2,samplerate=44100,scodec=none}}'");
-            media.AddOption(":no-sout-all");
-            media.AddOption(":sout-keep");
-            media.AddOption(":no-audio");
-            // Set the size and format of the video here.
-            _mediaPlayer.SetVideoFormat("RV32", _width, _height, _pitch);
-            _mediaPlayer.SetVideoCallbacks(Lock, null, Display);
-
-            // Start recording
-            _mediaPlayer.Play(media);
-
-            // Waits for the processing to stop
-            try
+            using (_libVlc = new LibVLC())
+            using (_mediaPlayer = new MediaPlayer(_libVlc))
             {
-                await ProcessThumbnails(processingCancellationTokenSource.Token);
-            }
-            catch (OperationCanceledException exception)
-            {
-                _logger.LogError(exception, "Operation cancelled");
-            }
-            catch (Exception exception)
-            {
-                _logger.LogError(exception, "Unexpected exception");
+                // Listen to events
+                var processingCancellationTokenSource = new CancellationTokenSource();
+                _mediaPlayer.Stopped += delegate { processingCancellationTokenSource.CancelAfter(1); };
+
+                // Create new media
+                using var media = new Media(_libVlc, "v4l2:///dev/video0", FromType.FromLocation);
+                media.AddOption($":chroma=mp2v --v4l2-width {_width} --v4l2-height {_height}");
+                media.AddOption("::sout='#transcode{{vcodec=h264,acodec=mpga,ab=128,channels=2,samplerate=44100,scodec=none}}'");
+                media.AddOption(":no-sout-all");
+                media.AddOption(":sout-keep");
+                media.AddOption(":no-audio");
+                // Set the size and format of the video here.
+                _mediaPlayer.SetVideoFormat("RV32", _width, _height, _pitch);
+                _mediaPlayer.SetVideoCallbacks(Lock, null, Display);
+
+                // Start recording
+                _mediaPlayer.Play(media);
+
+                // Waits for the processing to stop
+                try
+                {
+                    await ProcessThumbnails(processingCancellationTokenSource.Token);
+                }
+                catch (OperationCanceledException exception)
+                {
+                    _logger.LogError(exception, "Operation cancelled");
+                }
+                catch (Exception exception)
+                {
+                    _logger.LogError(exception, "Unexpected exception");
+                }   
             }
         }
 

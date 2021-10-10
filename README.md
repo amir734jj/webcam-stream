@@ -23,6 +23,8 @@ Notes:
 Bonus:
 - Blazor app to stream images to create a live stream
 
+![screenshot](assets/screencapture.png)
+
 TODO:
 - ability to select the webcam form a list
 - detect webcam resolution instead of guessing it
