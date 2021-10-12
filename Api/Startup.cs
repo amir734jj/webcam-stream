@@ -25,7 +25,6 @@ namespace Api
             
             services.AddRazorPages();
             services.AddServerSideBlazor();
-            services.AddSingleton<ImageStream>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

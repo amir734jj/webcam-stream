@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.IO.MemoryMappedFiles;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -25,13 +26,13 @@ namespace WebcamStream
         /// the number of bytes per "line"
         /// For performance reasons inside the core of VLC, it must be aligned to multiples of 32.
         /// </summary>
-        private readonly uint _pitch;
+        private uint _pitch;
 
         /// <summary>
         /// The number of lines in the buffer.
         /// For performance reasons inside the core of VLC, it must be aligned to multiples of 32.
         /// </summary>
-        private readonly uint _lines;
+        private uint _lines;
 
         /// <summary>
         /// Capture height
@@ -46,7 +47,7 @@ namespace WebcamStream
         /// <summary>
         /// Timespan between each capture
         /// </summary>
-        private readonly TimeSpan _between;
+        private TimeSpan _between;
 
         /// <summary>
         /// Logger instance
@@ -78,25 +79,32 @@ namespace WebcamStream
         /// </summary>
         private ulong _frameCounter;
 
-        private LibVLC _libVlc;
+        private readonly LibVLC _libVlc;
         
         private MediaPlayer _mediaPlayer;
 
         /// <summary>
         /// Constructor
         /// </summary>
+        /// <param name="logger"></param>
+        public ImageCapture(ILogger logger)
+        {
+            _logger = logger;
+            _filesToProcess = new ConcurrentQueue<(MemoryMappedFile file, MemoryMappedViewAccessor accessor)>();
+            _libVlc = new LibVLC();
+        }
+
+        /// <summary>
+        /// Begins extracting the thumbnails
+        /// </summary>
+        /// <param name="selectedDevice"></param>
         /// <param name="width"></param>
         /// <param name="height"></param>
         /// <param name="between"></param>
-        /// <param name="logger"></param>
-        public ImageCapture(uint width, uint height, TimeSpan between, ILogger logger)
+        /// <returns></returns>
+        public async Task Run(string selectedDevice, uint width, uint height, TimeSpan between)
         {
-            _height = height;
-            _width = width;
             _between = between;
-            _logger = logger;
-            _filesToProcess = new ConcurrentQueue<(MemoryMappedFile file, MemoryMappedViewAccessor accessor)>();
-
             _pitch = Align(width * BytePerPixel);
             _lines = Align(height);
 
@@ -109,18 +117,10 @@ namespace WebcamStream
 
                 return (size / 32 + 1) * 32; // Align on the next multiple of 32
             }
-        }
-
-        /// <summary>
-        /// Begins extracting the thumbnails
-        /// </summary>
-        /// <returns></returns>
-        public async Task Run()
-        {
+            
             // Load native libVlc library
             Core.Initialize();
 
-            using (_libVlc = new LibVLC())
             using (_mediaPlayer = new MediaPlayer(_libVlc))
             {
                 // Listen to events
@@ -128,7 +128,7 @@ namespace WebcamStream
                 _mediaPlayer.Stopped += delegate { processingCancellationTokenSource.CancelAfter(1); };
 
                 // Create new media
-                using var media = new Media(_libVlc, "v4l2:///dev/video0", FromType.FromLocation);
+                using var media = new Media(_libVlc, selectedDevice, FromType.FromLocation);
                 media.AddOption($":chroma=mp2v --v4l2-width {_width} --v4l2-height {_height}");
                 media.AddOption("::sout='#transcode{{vcodec=h264,acodec=mpga,ab=128,channels=2,samplerate=44100,scodec=none}}'");
                 media.AddOption(":no-sout-all");
@@ -153,7 +153,7 @@ namespace WebcamStream
                 catch (Exception exception)
                 {
                     _logger.LogError(exception, "Unexpected exception");
-                }   
+                } 
             }
         }
 
@@ -226,6 +226,31 @@ namespace WebcamStream
             }
 
             _frameCounter++;
+        }
+
+        /// <summary>
+        /// Returns the media resource locator of the device
+        /// </summary>
+        /// <returns></returns>
+        public List<string> GetVideoDevices()
+        {
+            var mds = _libVlc.MediaDiscoverers(MediaDiscovererCategory.Devices);
+            if (mds.Any(x => x.LongName == "Video capture"))
+            {
+                var devices = mds.First(x => x.LongName == "Video capture");
+                if (devices.Name != null)
+                {
+                    var md = new MediaDiscoverer(_libVlc, devices.Name);
+                    md.Start();
+                    if (md.MediaList != null)
+                    {
+                        return md.MediaList.Select(x => x.Mrl).ToList();
+                    }
+                    md.Dispose();
+                }
+            }
+
+            return new List<string>();
         }
 
         public void Dispose()

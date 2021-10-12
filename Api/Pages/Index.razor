@@ -1,36 +1,81 @@
 ﻿@page "/"
-@inject ImageStream _imageStream
+@using WebcamStream
+@using System.IO
+@using Microsoft.Extensions.Logging
+@using SixLabors.ImageSharp
+@using WebcamStream.Models
+@inject ILogger<Index> _logger
 
 <h1>Hello, world!</h1>
 
 Welcome to your new app.
 
+<select name="cars" id="cars" @bind="SelectedDevice">
+    @if (_devices != null)
+    {
+        @foreach (var device in _devices)
+        {
+            <option value="@device">@device</option>
+        }
+    }
+</select>
+
 @if (_image != null)
 {
-    <img src="@_image" alt="Frame number" style="display: block"  />
+    <img src="@_image" alt="Frame number" style="display: block"/>
 }
 
 @code {
     private string _image;
 
+    private ImageCapture _imageCapture;
+
+    private string _selectedDevice;
+    
+    private string SelectedDevice
+    {
+        get => _selectedDevice;
+        set
+        {
+            _selectedDevice = value;
+            Dispose();
+            Build();
+        }
+    }
+
+    private List<string> _devices;
+
     protected override void OnInitialized()
     {
-        _imageStream.ImageBase64Handler += ImageHandlerCallback;
+        Build();
     }
 
-    void ImageHandlerCallback(object _, string payload)
+    void ImageHandlerCallback(object _, Payload payload)
     {
-        _image = payload;
+        var stream = new MemoryStream();
+        payload.Image.SaveAsJpeg(stream);
+
+        var base64 = Convert.ToBase64String(stream.ToArray());
+        _image = $"data:image/jpg;base64,{base64}";
         InvokeAsync(StateHasChanged);
     }
-    
+
+    // ReSharper disable once MemberCanBePrivate.Global
     public void Dispose()
     {
-        _imageStream.ImageBase64Handler -= ImageHandlerCallback;
+        _imageCapture.ImageHandler -= ImageHandlerCallback;
+        _imageCapture.Dispose();
     }
 
-    public void IncrementCount()
+    private void Build()
     {
+        _imageCapture = new ImageCapture(_logger);
+
+        _devices ??= _imageCapture.GetVideoDevices();
+        _selectedDevice ??= _devices.FirstOrDefault();
         
+        _imageCapture.ImageHandler += ImageHandlerCallback;
+
+        _imageCapture.Run(SelectedDevice, 640, 480, TimeSpan.FromSeconds(1));
     }
 }

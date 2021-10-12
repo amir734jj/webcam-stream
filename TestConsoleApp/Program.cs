@@ -13,7 +13,7 @@ namespace TestConsoleApp
         {
             var logging = LoggerFactory.Create(x => x.AddConsole());
             var logger = logging.CreateLogger<ImageCapture>();
-            var imageCapture = new ImageCapture(920, 720, TimeSpan.FromSeconds(1), logger);
+            var imageCapture = new ImageCapture(logger);
             imageCapture.ImageHandler += (_, payload) =>
             {
                 var stream = new MemoryStream();
@@ -21,7 +21,7 @@ namespace TestConsoleApp
                 File.WriteAllBytes($"../../../{payload.SequenceNumber:0000}.jpg", stream.ToArray());
             };
 
-            await imageCapture.Run();
+            await imageCapture.Run("v4l2:///dev/video0", 1280, 720, TimeSpan.FromSeconds(1));
         }
     }
 }
