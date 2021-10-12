@@ -21,7 +21,7 @@ namespace TestConsoleApp
                 File.WriteAllBytes($"../../../{payload.SequenceNumber:0000}.jpg", stream.ToArray());
             };
 
-            await imageCapture.Run("v4l2:///dev/video0", 1280, 720, TimeSpan.FromSeconds(1));
+            await imageCapture.Run("v4l2:///dev/video0", 680, 480, TimeSpan.FromSeconds(1));
         }
     }
 }

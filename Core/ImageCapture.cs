@@ -79,7 +79,7 @@ namespace WebcamStream
         /// </summary>
         private ulong _frameCounter;
 
-        private readonly LibVLC _libVlc;
+        private LibVLC _libVlc;
         
         private MediaPlayer _mediaPlayer;
 
@@ -91,7 +91,9 @@ namespace WebcamStream
         {
             _logger = logger;
             _filesToProcess = new ConcurrentQueue<(MemoryMappedFile file, MemoryMappedViewAccessor accessor)>();
-            _libVlc = new LibVLC();
+            
+            // Load native libVlc library
+            Core.Initialize();
         }
 
         /// <summary>
@@ -117,10 +119,8 @@ namespace WebcamStream
 
                 return (size / 32 + 1) * 32; // Align on the next multiple of 32
             }
-            
-            // Load native libVlc library
-            Core.Initialize();
 
+            using (_libVlc = new LibVLC())
             using (_mediaPlayer = new MediaPlayer(_libVlc))
             {
                 // Listen to events
