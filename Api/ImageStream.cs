@@ -1,38 +1,32 @@
 using System;
-using System.IO;
+using System.Collections.Generic;
+using GenericSubscription;
+using GenericSubscription.Interfaces;
 using Microsoft.Extensions.Logging;
-using SixLabors.ImageSharp;
 using WebcamStream;
 
 namespace Api
 {
-    public class ImageStream : IDisposable
+    public class ImageStream
     {
-        public EventHandler<string> ImageBase64Handler;
+        public ISubscriptionManagement<string, ImageCapture> SubscriptionMgmt { get; }
         
-        private readonly ImageCapture imageCapture;
+        public IReadOnlyList<string> Devices { get; }
 
         public ImageStream(ILogger<ImageStream> logger)
         {
-            imageCapture = new ImageCapture(640, 480, TimeSpan.FromSeconds(1), logger);
+            var imageCapture = new ImageCapture(logger);
 
-            imageCapture.ImageHandler += (_, payload) =>
+            Devices = imageCapture.GetVideoDevices();
+            
+            SubscriptionMgmt = SubscriptionMgmtBuilder.AsSubscriptionMgmt((string device) =>
             {
-                var stream = new MemoryStream();
-                payload.Image.SaveAsJpeg(stream);
+                var imageCapture = new ImageCapture(logger);
 
-                var base64 = Convert.ToBase64String(stream.ToArray());
-                var image = $"data:image/jpg;base64,{base64}";
-               
-                ImageBase64Handler?.Invoke(null, image);
-            };
+                imageCapture.Run(device, 640, 480, TimeSpan.FromSeconds(1));
 
-            imageCapture.Run();
-        }
-
-        public void Dispose()
-        {
-            imageCapture.Dispose();
+                return imageCapture;
+            });
         }
     }
 }

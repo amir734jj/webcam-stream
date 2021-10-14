@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using SixLabors.ImageSharp;
@@ -13,7 +14,11 @@ namespace TestConsoleApp
         {
             var logging = LoggerFactory.Create(x => x.AddConsole());
             var logger = logging.CreateLogger<ImageCapture>();
-            var imageCapture = new ImageCapture(920, 720, TimeSpan.FromSeconds(1), logger);
+            var imageCapture = new ImageCapture(logger);
+
+            var devices = imageCapture.GetVideoDevices();
+            var selectedDevice = devices.First();
+            
             imageCapture.ImageHandler += (_, payload) =>
             {
                 var stream = new MemoryStream();
@@ -21,7 +26,7 @@ namespace TestConsoleApp
                 File.WriteAllBytes($"../../../{payload.SequenceNumber:0000}.jpg", stream.ToArray());
             };
 
-            await imageCapture.Run();
+            await imageCapture.Run(selectedDevice, 640, 480, TimeSpan.FromSeconds(1));
         }
     }
 }
